@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unity School — Шкільний Портал</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .bg-unity-header { background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%); }
+        .btn-tab-active { background-color: #4338ca !important; color: #ffffff !important; font-weight: 600; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-gray-800">
+
+    <div id="app" class="flex-1 flex flex-col"></div>
+
+    <script>
+        let db = { currentUser: null, users: [], classes: [], subjects: [], schedule: [], lessons: [], grades: [] };
+        let currentTab = 'teachers';
+
+        async function loadCloudDB() {
+            try {
+                const response = await fetch('/api/data');
+                if (response.ok) {
+                    db = await response.json();
+                }
+            } catch(e) {
+                console.error("Помилка завантаження даних:", e);
+            }
+            render();
+        }
+
+        async function saveCloudDB() {
+            try {
+                await fetch('/api/data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(db)
+                });
+            } catch(e) {
+                console.error("Помилка збереження даних:", e);
+            }
+        }
+
+        loadCloudDB();
+
+        function calculateAge(birthDateStr) {
+            if (!birthDateStr) return '-';
+            const birthDate = new Date(birthDateStr);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+            return isNaN(age) ? '-' : `${age} років`;
+        }
+
+        function formatLinks(text) {
+            if (!text) return '';
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return text.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-medium font-mono text-xs break-all"><i class="fa-solid fa-link"></i> Перейти за посиланням</a>`;
+            });
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            if (!db.currentUser) {
+                app.innerHTML = renderLogin();
+            } else {
+                app.innerHTML = `
+                    ${renderHeader()}
+                    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
+                        ${renderMainContent()}
+                    </main>
+                `;
+            }
+        }
+
+        function renderLogin() {
+            return `
+                <div class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+                    <div class="bg-slate-800 text-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-slate-700">
+                        <div class="text-center mb-8">
+                            <div class="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4">
+                                <i class="fa-solid fa-graduation-cap text-3xl text-white"></i>
+                            </div>
+                            <h1 class="text-3xl font-bold tracking-tight">Unity School</h1>
+                            <p class="text-slate-400 text-sm mt-1">Портал управління школою</p>
+                        </div>
+
+                        <form onsubmit="handleLogin(event)" class="space-y-5">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Логін</label>
+                                <input type="text" id="login_user" required placeholder="Введіть ваш логін" 
+                                    class="w-full px-4 py-3 bg-slate-900/80 border border-slate-700 rounded-xl text-sm text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Пароль</label>
+                                <input type="password" id="login_pass" required placeholder="••••••••" 
+                                    class="w-full px-4 py-3 bg-slate-900/80 border border-slate-700 rounded-xl text-sm text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+
+                            <button type="submit" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition shadow-lg shadow-indigo-600/30">
+                                Увійти до системи &rarr;
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderHeader() {
+            const u = db.currentUser;
+            let roleTitle = (u.role === 'superadmin') ? 'Головний Адміністратор' : (u.role === 'admin' ? 'Адміністратор' : (u.role === 'teacher' ? 'Вчитель' : 'Учень'));
+
+            return `
+                <header class="bg-unity-header text-white shadow-md">
+                    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center border border-white/20">
+                                <i class="fa-solid fa-graduation-cap text-xl"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-xl font-bold leading-none">Unity School</h1>
+                                <span class="text-xs text-blue-100 font-medium">${roleTitle}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <button onclick="exportData()" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-semibold transition border border-white/20">
+                                <i class="fa-solid fa-download mr-1"></i> Резервна копія
+                            </button>
+                            <button onclick="handleLogout()" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition border border-white/20">
+                                <i class="fa-solid fa-right-from-bracket"></i> Вийти
+                            </button>
+                        </div>
+                    </div>
+
+                    ${(u.role === 'superadmin' || u.role === 'admin' || u.role === 'teacher') ? `
+                    <div class="max-w-7xl mx-auto px-4 pt-2 pb-3 overflow-x-auto">
+                        <div class="flex items-center gap-2 min-w-max">
+                            \${(u.role === 'superadmin' || u.role === 'admin') ? `
+                            <button onclick="setTab('teachers')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'teachers' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-user-tie"></i> Вчителі</button>
+                            <button onclick="setTab('students')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'students' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-user-graduate"></i> Учні</button>
+                            ${u.role === 'superadmin' ? `<button onclick="setTab('admins')" class="px-4 py-2 rounded-xl text-sm font-medium transition \${currentTab === 'admins' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-user-shield"></i> Адміністратори</button>` : ''}
+                            <button onclick="setTab('classes')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'classes' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-school"></i> Класи</button>
+                            <button onclick="setTab('subjects')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'subjects' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-book"></i> Предмети</button>
+                            ` : ''}
+                            <button onclick="setTab('schedule')" class="px-4 py-2 rounded-xl text-sm font-medium transition \${currentTab === 'schedule' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-calendar-days"></i> Розклад</button>
+                            \${u.role === 'teacher' ? `<button onclick="setTab('journal')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'journal' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-clipboard-list"></i> Електронний Журнал</button>` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
+                </header>
+            `;
+        }
+
+        function renderMainContent() {
+            const u = db.currentUser;
+            if (u.role === 'student') return currentTab === 'schedule' ? renderScheduleTab() : renderStudentDiary();
+
+            switch (currentTab) {
+                case 'teachers': return renderTeachersTab();
+                case 'students': return renderStudentsTab();
+                case 'admins': return renderAdminsTab();
+                case 'classes': return renderClassesTab();
+                case 'subjects': return renderSubjectsTab();
+                case 'schedule': return renderScheduleTab();
+                case 'journal': return u.role === 'teacher' ? renderTeacherJournal() : renderScheduleTab();
+                default: return renderTeachersTab();
+            }
+        }
+
+        function renderScheduleTab() {
+            const isCanEdit = db.currentUser.role === 'superadmin' || db.currentUser.role === 'admin';
+            const days = ['Понеділок', 'Вівторок', 'Середа', 'Четвер', 'П\'ятниця'];
+            const selClass = document.getElementById('sched_class_filter')?.value || db.classes[0] || '';
+
+            return `
+                <div class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div class="flex items-center gap-2 text-indigo-600 font-bold text-lg">
+                            <i class="fa-solid fa-calendar-days text-xl"></i>
+                            <h2>Розклад Уроків</h2>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-semibold uppercase text-gray-500 mr-2">Виберіть клас:</label>
+                            <select id="sched_class_filter" onchange="render()" class="px-3 py-1.5 border rounded-xl font-bold text-indigo-600 bg-gray-50">
+                                ${db.classes.map(c => `<option value="\${c}" ${c === selClass ? 'selected' : ''}>Клас ${c}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    ${isCanEdit ? `
+                    <div class="bg-white rounded-2xl shadow-sm border p-5">
+                        <h3 class="text-sm font-bold text-gray-800 mb-3">+ Додати урок до розкладу (Клас \${selClass})</h3>
+                        <form onsubmit="handleAddSchedule(event, '\${selClass}')" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                            <select id="sc_day" required class="px-3 py-2 border rounded-xl text-sm">
+                                \${days.map(d => `<option value="${d}">${d}</option>`).join('')}
+                            </select>
+                            <input type="number" id="sc_num" min="1" max="10" placeholder="№ уроку" required class="px-3 py-2 border rounded-xl text-sm">
+                            <select id="sc_subj" required class="px-3 py-2 border rounded-xl text-sm">
+                                \${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
+                            </select>
+                            <input type="text" id="sc_room" placeholder="Кабінет" class="px-3 py-2 border rounded-xl text-sm">
+                            <button type="submit" class="py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm">
+                                Додати
+                            </button>
+                        </form>
+                    </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        ${days.map(day => {
+                            const dayLessons = db.schedule.filter(s => s.studentClass === selClass && s.day === day).sort((a,b) => a.lessonNumber - b.lessonNumber);
+                            return `
+                                <div class="bg-white rounded-2xl shadow-sm border p-4 flex flex-col">
+                                    <h4 class="font-bold text-center text-indigo-900 border-b pb-2 mb-3 bg-indigo-50/50 -mx-4 -mt-4 p-3 rounded-t-2xl">\${day}</h4>
+                                    <div class="space-y-2 flex-1">
+                                        \${dayLessons.length === 0 ? `<p class="text-center text-xs text-gray-400 py-4">Немає уроків</p>` : dayLessons.map(item => `
+                                            <div class="p-2.5 bg-gray-50 border rounded-xl text-xs flex justify-between items-start">
+                                                <div>
+                                                    <span class="font-bold text-indigo-600">${item.lessonNumber}. ${item.subject}</span>
+                                                    <div class="text-gray-400 mt-0.5">Каб: ${item.room || '-'}</div>
+                                                </div>
+                                                ${isCanEdit ? `<button onclick="handleDeleteSchedule('\${item.id}')" class="text-red-400 hover:text-red-600 ml-1"><i class="fa-solid fa-xmark"></i></button>` : ''}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTeachersTab() {
+            const teachers = db.users.filter(x => x.role === 'teacher');
+
+            return `
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border p-5">
+                        <h2 class="text-indigo-600 font-bold text-lg mb-4 flex items-center gap-2"><i class="fa-solid fa-user-plus"></i> Додати вчителя</h2>
+                        <form onsubmit="handleAddTeacher(event)" class="space-y-4">
+                            <div><label class="block text-xs font-semibold text-gray-600 uppercase mb-1">ПІБ Вчителя</label><input type="text" id="t_name" required placeholder="Шевченко Ольга Іванівна" class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Дата народження</label><input type="date" id="t_dob" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Предмети</label>
+                                <select id="t_subjects" multiple required class="w-full px-3 py-2 border rounded-xl text-sm h-24 custom-scrollbar">
+                                    ${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Класи</label>
+                                <select id="t_classes" multiple required class="w-full px-3 py-2 border rounded-xl text-sm h-20 custom-scrollbar">
+                                    ${db.classes.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div><label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Логін</label><input type="text" id="t_login" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Пароль</label><input type="text" id="t_pass" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-indigo-600 text-white font-semibold rounded-xl text-sm shadow-md">+ Додати вчителя</button>
+                        </form>
+                    </div>
+
+                    <div class="lg:col-span-8 bg-white rounded-2xl shadow-sm border p-5">
+                        <h2 class="text-gray-800 font-bold text-lg mb-4 flex items-center gap-2"><i class="fa-solid fa-list-ul text-indigo-600"></i> Список вчителів</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead><tr class="border-b bg-gray-50 text-gray-500 uppercase text-[11px]"><th class="p-3">ПІБ</th><th class="p-3">Вік</th><th class="p-3">Предмети</th><th class="p-3">Класи</th><th class="p-3">Логін/Пароль</th><th class="p-3 text-right">Дії</th></tr></thead>
+                                <tbody class="divide-y">
+                                    ${teachers.map(t => `
+                                        <tr>
+                                            <td class="p-3 font-semibold">\${t.fullName}</td>
+                                            <td class="p-3">\${calculateAge(t.birthDate)}</td>
+                                            <td class="p-3">\${(t.subjects||[]).join(', ')}</td>
+                                            <td class="p-3">\${(t.classes||[]).join(', ')}</td>
+                                            <td class="p-3 font-mono text-xs text-indigo-600">${t.login} /${t.password}</td>
+                                            <td class="p-3 text-right"><button onclick="handleDeleteUser('\${t.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStudentsTab() {
+            const students = db.users.filter(x => x.role === 'student');
+            return `
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border p-5">
+                        <h2 class="text-indigo-600 font-bold text-lg mb-4"><i class="fa-solid fa-user-plus"></i> Додати учня</h2>
+                        <form onsubmit="handleAddStudent(event)" class="space-y-4">
+                            <div><label class="block text-xs uppercase text-gray-600 mb-1">ПІБ Учня</label><input type="text" id="s_name" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                            <div><label class="block text-xs uppercase text-gray-600 mb-1">Клас</label><select id="s_class" required class="w-full px-3 py-2 border rounded-xl text-sm">${db.classes.map(c => `<option value="${c}">${c}</option>`).join('')}</select></div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div><label class="block text-xs uppercase text-gray-600 mb-1">Логін</label><input type="text" id="s_login" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                                <div><label class="block text-xs uppercase text-gray-600 mb-1">Пароль</label><input type="text" id="s_pass" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-indigo-600 text-white font-semibold rounded-xl text-sm">+ Додати учня</button>
+                        </form>
+                    </div>
+
+                    <div class="lg:col-span-8 bg-white rounded-2xl shadow-sm border p-5">
+                        <h2 class="text-gray-800 font-bold text-lg mb-4"><i class="fa-solid fa-users text-indigo-600"></i> Список учнів</h2>
+                        <table class="w-full text-left text-sm">
+                            <thead><tr class="border-b bg-gray-50 uppercase text-[11px]"><th class="p-3">ПІБ</th><th class="p-3">Клас</th><th class="p-3">Логін / Пароль</th><th class="p-3 text-right">Дії</th></tr></thead>
+                            <tbody class="divide-y">
+                                ${students.map(s => `
+                                    <tr>
+                                        <td class="p-3 font-semibold">\${s.fullName}</td>
+                                        <td class="p-3 font-bold text-indigo-600">\${s.studentClass}</td>
+                                        <td class="p-3 font-mono text-xs">${s.login} /${s.password}</td>
+                                        <td class="p-3 text-right"><button onclick="handleDeleteUser('\${s.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAdminsTab() {
+            const admins = db.users.filter(x => x.role === 'admin' || x.role === 'superadmin');
+
+            return `
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border p-5">
+                        <h2 class="text-indigo-600 font-bold text-lg mb-4"><i class="fa-solid fa-user-shield"></i> Додати адміна</h2>
+                        <form onsubmit="handleAddAdmin(event)" class="space-y-4">
+                            <div><label class="block text-xs uppercase text-gray-600 mb-1">ПІБ Адміністратора</label><input type="text" id="a_name" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div><label class="block text-xs uppercase text-gray-600 mb-1">Логін</label><input type="text" id="a_login" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                                <div><label class="block text-xs uppercase text-gray-600 mb-1">Пароль</label><input type="text" id="a_pass" required class="w-full px-3 py-2 border rounded-xl text-sm"></div>
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-indigo-600 text-white font-semibold rounded-xl text-sm">+ Додати адміністратора</button>
+                        </form>
+                    </div>
+
+                    <div class="lg:col-span-8 bg-white rounded-2xl shadow-sm border p-5">
+                        <h2 class="text-gray-800 font-bold text-lg mb-4"><i class="fa-solid fa-user-shield text-indigo-600"></i> Список адміністраторів</h2>
+                        <table class="w-full text-left text-sm">
+                            <thead><tr class="border-b bg-gray-50 uppercase text-[11px]"><th class="p-3">ПІБ</th><th class="p-3">Логін / Пароль</th><th class="p-3 text-right">Дії</th></tr></thead>
+                            <tbody class="divide-y">
+                                ${admins.map(a => `
+                                    <tr>
+                                        <td class="p-3 font-semibold">\${a.fullName}</td>
+                                        <td class="p-3 font-mono text-xs">${a.login} /${a.password}</td>
+                                        <td class="p-3 text-right">
+                                            \${a.role !== 'superadmin' ? `<button onclick="handleDeleteUser('${a.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-xs text-gray-400 font-medium">Головний</span>'}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderClassesTab() {
+            return `
+                <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border p-6">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-school text-indigo-600"></i> Управління Класами</h2>
+                    <form onsubmit="handleAddClass(event)" class="flex gap-3 mb-6"><input type="text" id="new_class_name" required placeholder="8-Б" class="flex-1 px-4 py-2 border rounded-xl text-sm"><button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">Додати клас</button></form>
+                    <div class="flex flex-wrap gap-2">${db.classes.map(c => `<div class="px-4 py-2 bg-indigo-50 rounded-xl text-indigo-800 font-semibold text-sm flex items-center gap-3"><span>Клас \${c}</span><button onclick="handleDeleteClass('\${c}')" class="text-indigo-400 hover:text-red-600"><i class="fa-solid fa-xmark text-xs"></i></button></div>`).join('')}</div>
+                </div>
+            `;
+        }
+
+        function renderSubjectsTab() {
+            return `
+                <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border p-6">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-book text-indigo-600"></i> Навчальні Предмети</h2>
+                    <form onsubmit="handleAddSubject(event)" class="flex gap-3 mb-6"><input type="text" id="new_subject_name" required placeholder="Біологія" class="flex-1 px-4 py-2 border rounded-xl text-sm"><button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">Додати предмет</button></form>
+                    <div class="flex flex-wrap gap-2">${db.subjects.map(s => `<div class="px-4 py-2 bg-emerald-50 rounded-xl text-emerald-800 font-semibold text-sm flex items-center gap-3"><span>\${s}</span><button onclick="handleDeleteSubject('\${s}')" class="text-emerald-400 hover:text-red-600"><i class="fa-solid fa-xmark text-xs"></i></button></div>`).join('')}</div>
+                </div>
+            `;
+        }
+
+        function renderTeacherJournal() {
+            const u = db.currentUser;
+            const myClasses = (u.classes && u.classes.length > 0) ? u.classes : db.classes;
+            const mySubjects = (u.subjects && u.subjects.length > 0) ? u.subjects : db.subjects;
+
+            const selClass = document.getElementById('j_class_filter')?.value || myClasses[0] || '';
+            const selSubj = document.getElementById('j_subj_filter')?.value || mySubjects[0] || '';
+            const studentsInClass = db.users.filter(usr => usr.role === 'student' && usr.studentClass === selClass);
+
+            return `
+                <div class="bg-white rounded-2xl shadow-sm border p-6 space-y-6">
+                    <div class="flex flex-col md:flex-row items-center justify-between gap-4 border-b pb-4">
+                        <h2 class="text-indigo-600 font-bold text-xl"><i class="fa-solid fa-clipboard-list"></i> Електронний Журнал Вчителя</h2>
+                        <div class="flex gap-3">
+                            <select id="j_class_filter" onchange="render()" class="px-3 py-1.5 border rounded-xl font-semibold">
+                                ${myClasses.map(c => `<option value="\${c}" ${c === selClass ? 'selected' : ''}>Клас ${c}</option>`).join('')}
+                            </select>
+                            <select id="j_subj_filter" onchange="render()" class="px-3 py-1.5 border rounded-xl font-semibold">
+                                ${mySubjects.map(s => `<option value="\${s}" ${s === selSubj ? 'selected' : ''}>${s}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
+                        <h3 class="text-sm font-bold text-indigo-900 mb-2">Проведення уроку (${selSubj}, Клас ${selClass})</h3>
+                        <form onsubmit="handleSaveLesson(event, '${selClass}', '${selSubj}')" class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                            <input type="text" id="l_topic" required placeholder="Тема уроку (можна з посиланнями)" class="md:col-span-5 px-3 py-2 border rounded-xl text-sm bg-white">
+                            <input type="text" id="l_hw" placeholder="Домашнє завдання" class="md:col-span-5 px-3 py-2 border rounded-xl text-sm bg-white">
+                            <button type="submit" class="md:col-span-2 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">Зберегти</button>
+                        </form>
+                    </div>
+
+                    <table class="w-full text-left text-sm">
+                        <thead><tr class="border-b bg-gray-50 uppercase text-[11px]"><th class="p-3">ПІБ Учня</th><th class="p-3">Оцінка (1-12 / Н)</th><th class="p-3 text-right">Історія</th></tr></thead>
+                        <tbody class="divide-y">
+                            ${studentsInClass.length === 0 ? `<tr><td colspan="3" class="p-4 text-center text-gray-400">У цьому класі поки немає учнів</td></tr>` : studentsInClass.map(s => {
+                                const stGrades = db.grades.filter(g => g.studentId === s.id && g.subject === selSubj);
+                                return `
+                                    <tr>
+                                        <td class="p-3 font-semibold">\${s.fullName}</td>
+                                        <td class="p-3 flex items-center gap-2">
+                                            <input type="text" id="grade_val_\${s.id}" placeholder="1-12 / Н" class="w-24 px-2 py-1 border rounded text-sm text-center">
+                                            <button onclick="handleAddGrade('${s.id}', '${selSubj}')" class="px-3 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700">Оцінити</button>
+                                        </td>
+                                        <td class="p-3 text-right">
+                                            \${stGrades.map(g => `<span class="px-2 py-0.5 ${g.val==='Н'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-800'} rounded text-xs font-bold mr-1">${g.val}</span>`).join('')}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function renderStudentDiary() {
+            const u = db.currentUser;
+            const myLessons = db.lessons.filter(l => l.studentClass === u.studentClass);
+
+            return `
+                <div class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border p-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-900">${u.fullName}</h2>
+                            <p class="text-sm text-gray-500">Учень класу ${u.studentClass}</p>
+                        </div>
+                        <button onclick="setTab('schedule')" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">
+                            <i class="fa-solid fa-calendar-days mr-1"></i> Переглянути розклад
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border p-6">
+                        <h3 class="text-lg font-bold mb-4">Уроки та Домашні Завдання</h3>
+                        <div class="space-y-3">
+                            ${myLessons.length === 0 ? `<p class="text-gray-400 text-sm py-4">Уроків поки немає</p>` : myLessons.slice().reverse().map(l => `
+                                <div class="p-4 border rounded-xl bg-gray-50/50">
+                                    <div class="flex justify-between font-bold text-indigo-600 text-sm mb-1">
+                                        <span>\${l.subject}</span><span class="text-xs text-gray-400">\${l.date}</span>
+                                    </div>
+                                    <div class="text-sm font-semibold mb-1">Тема: ${formatLinks(l.topic)}</div>${l.homework ? `<div class="text-xs bg-amber-50 text-amber-900 border border-amber-200 p-2 rounded mt-2"><strong>Д/З:</strong> ${l.homework}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const log = document.getElementById('login_user').value.trim();
+            const pas = document.getElementById('login_pass').value.trim();
+
+            const found = db.users.find(u => u.login === log && u.password === pas);
+            if (found) {
+                db.currentUser = found;
+                saveCloudDB();
+                render();
+            } else {
+                alert('Невірний логін або пароль!');
+            }
+        }
+
+        function handleLogout() {
+            db.currentUser = null;
+            saveCloudDB();
+            render();
+        }
+
+        function setTab(tab) {
+            currentTab = tab;
+            render();
+        }
+
+        async function handleAddTeacher(e) {
+            e.preventDefault();
+            const name = document.getElementById('t_name').value.trim();
+            const dob = document.getElementById('t_dob').value;
+            const subjs = Array.from(document.getElementById('t_subjects').selectedOptions).map(o => o.value);
+            const clss = Array.from(document.getElementById('t_classes').selectedOptions).map(o => o.value);
+            const log = document.getElementById('t_login').value.trim();
+            const pas = document.getElementById('t_pass').value.trim();
+
+            if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
+
+            db.users.push({ id: 'usr_' + Date.now(), fullName: name, birthDate: dob, subjects: subjs, classes: clss, login: log, password: pas, role: 'teacher' });
+            await saveCloudDB();
+            render();
+        }
+
+        async function handleAddStudent(e) {
+            e.preventDefault();
+            const name = document.getElementById('s_name').value.trim();
+            const cls = document.getElementById('s_class').value;
+            const log = document.getElementById('s_login').value.trim();
+            const pas = document.getElementById('s_pass').value.trim();
+
+            if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
+
+            db.users.push({ id: 'usr_' + Date.now(), fullName: name, studentClass: cls, login: log, password: pas, role: 'student' });
+            await saveCloudDB();
+            render();
+        }
+
+        async function handleAddAdmin(e) {
+            e.preventDefault();
+            const name = document.getElementById('a_name').value.trim();
+            const log = document.getElementById('a_login').value.trim();
+            const pas = document.getElementById('a_pass').value.trim();
+
+            if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
+
+            db.users.push({ id: 'usr_' + Date.now(), fullName: name, login: log, password: pas, role: 'admin' });
+            await saveCloudDB();
+            render();
+        }
+
+        async function handleDeleteUser(id) {
+            if (confirm('Видалити користувача?')) {
+                db.users = db.users.filter(u => u.id !== id);
+                await saveCloudDB();
+                render();
+            }
+        }
+
+        async function handleAddClass(e) {
+            e.preventDefault();
+            const name = document.getElementById('new_class_name').value.trim();
+            if (name && !db.classes.includes(name)) { db.classes.push(name); await saveCloudDB(); render(); }
+        }
+
+        async function handleDeleteClass(clsName) {
+            db.classes = db.classes.filter(c => c !== clsName);
+            await saveCloudDB();
+            render();
+        }
+
+        async function handleAddSubject(e) {
+            e.preventDefault();
+            const name = document.getElementById('new_subject_name').value.trim();
+            if (name && !db.subjects.includes(name)) { db.subjects.push(name); await saveCloudDB(); render(); }
+        }
+
+        async function handleDeleteSubject(subjName) {
+            db.subjects = db.subjects.filter(s => s !== subjName);
+            await saveCloudDB();
+            render();
+        }
+
+        async function handleAddSchedule(e, cls) {
+            e.preventDefault();
+            const day = document.getElementById('sc_day').value;
+            const num = Number(document.getElementById('sc_num').value);
+            const subj = document.getElementById('sc_subj').value;
+            const room = document.getElementById('sc_room').value.trim();
+
+            db.schedule.push({ id: 'sc_' + Date.now(), studentClass: cls, day, lessonNumber: num, subject: subj, room });
+            await saveCloudDB();
+            render();
+        }
+
+        async function handleDeleteSchedule(id) {
+            db.schedule = db.schedule.filter(s => s.id !== id);
+            await saveCloudDB();
+            render();
+        }
+
+        async function handleSaveLesson(e, cls, subj) {
+            e.preventDefault();
+            const topic = document.getElementById('l_topic').value.trim();
+            const hw = document.getElementById('l_hw').value.trim();
+
+            db.lessons.push({ id: 'les_' + Date.now(), studentClass: cls, subject: subj, topic, homework: hw, date: new Date().toLocaleDateString('uk-UA') });
+            await saveCloudDB();
+            alert('Урок успішно збережено!');
+            document.getElementById('l_topic').value = '';
+            document.getElementById('l_hw').value = '';
+        }
+
+        async function handleAddGrade(studentId, subj) {
+            const input = document.getElementById(`grade_val_${studentId}`);
+            const val = input.value.trim().toUpperCase();
+            if (!val) return;
+
+            db.grades.push({ id: 'grd_' + Date.now(), studentId, subject: subj, val, date: new Date().toLocaleDateString('uk-UA') });
+            await saveCloudDB();
+            render();
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "unity_school_backup.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+    </script>
+</body>
+</html>
