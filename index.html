@@ -143,22 +143,7 @@
                         </div>
                     </div>
 
-                    ${(u.role === 'superadmin' || u.role === 'admin' || u.role === 'teacher') ? `
-                    <div class="max-w-7xl mx-auto px-4 pt-2 pb-3 overflow-x-auto">
-                        <div class="flex items-center gap-2 min-w-max">
-                            \${(u.role === 'superadmin' || u.role === 'admin') ? `
-                            <button onclick="setTab('teachers')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'teachers' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-user-tie"></i> Вчителі</button>
-                            <button onclick="setTab('students')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'students' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-user-graduate"></i> Учні</button>
-                            ${u.role === 'superadmin' ? `<button onclick="setTab('admins')" class="px-4 py-2 rounded-xl text-sm font-medium transition \${currentTab === 'admins' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-user-shield"></i> Адміністратори</button>` : ''}
-                            <button onclick="setTab('classes')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'classes' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-school"></i> Класи</button>
-                            <button onclick="setTab('subjects')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'subjects' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-book"></i> Предмети</button>
-                            ` : ''}
-                            <button onclick="setTab('schedule')" class="px-4 py-2 rounded-xl text-sm font-medium transition \${currentTab === 'schedule' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-calendar-days"></i> Розклад</button>
-                            \${u.role === 'teacher' ? `<button onclick="setTab('journal')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'journal' ? 'btn-tab-active' : 'bg-white/10 hover:bg-white/20'}"><i class="fa-solid fa-clipboard-list"></i> Електронний Журнал</button>` : ''}
-                        </div>
-                    </div>
-                    ` : ''}
-                </header>
+                   <div id="nav-tabs-container" class="max-w-7xl mx-auto px-4 pt-2 pb-3 overflow-x-auto"></div>
             `;
         }
 
@@ -620,7 +605,34 @@
             db.grades.push({ id: 'grd_' + Date.now(), studentId, subject: subj, val, date: new Date().toLocaleDateString('uk-UA') });
             await saveCloudDB();
             render();
-        }
+        }  function renderNavTabs() {
+    const container = document.getElementById('nav-tabs-container');
+    if (!container) return;
+    
+    const u = db.currentUser;
+    if (!u) return;
+    
+    let html = '<div class="flex items-center gap-2 min-w-max">';
+    
+    if (u.role === 'superadmin' || u.role === 'admin' || u.role === 'teacher') {
+        html += `<button onclick="setTab('teachers')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'teachers' ? 'btn-tab-active' : ''}">Вчителі</button>`;
+        html += `<button onclick="setTab('students')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'students' ? 'btn-tab-active' : ''}">Учні</button>`;
+    }
+    if (u.role === 'superadmin') {
+        html += `<button onclick="setTab('admins')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'admins' ? 'btn-tab-active' : ''}">Адміни</button>`;
+    }
+    if (u.role === 'superadmin' || u.role === 'admin') {
+        html += `<button onclick="setTab('classes')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'classes' ? 'btn-tab-active' : ''}">Класи</button>`;
+        html += `<button onclick="setTab('subjects')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'subjects' ? 'btn-tab-active' : ''}">Предмети</button>`;
+        html += `<button onclick="setTab('schedule')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'schedule' ? 'btn-tab-active' : ''}">Розклад</button>`;
+    }
+    if (u.role === 'teacher') {
+        html += `<button onclick="setTab('journal')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'journal' ? 'btn-tab-active' : ''}">Журнал</button>`;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
 
         function exportData() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
