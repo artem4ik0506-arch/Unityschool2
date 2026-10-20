@@ -21,34 +21,43 @@
     <div id="app" class="flex-1 flex flex-col"></div>
 
     <script>
-        let db = { currentUser: null, users: [], classes: [], subjects: [], schedule: [], lessons: [], grades: [] };
+        const DEFAULT_DATA = {
+            currentUser: null,
+            users: [
+                {
+                    id: 'usr_admin_root',
+                    login: 'admin',
+                    password: '123',
+                    fullName: 'Головний Адміністратор',
+                    role: 'superadmin'
+                }
+            ],
+            classes: ['7-А', '7-Б', '8-А', '9-А', '10-А', '11-А'],
+            subjects: ['Математика', 'Українська мова', 'Фізика', 'Історія України', 'Англійська мова', 'Інформатика'],
+            schedule: [],
+            lessons: [],
+            grades: []
+        };
+
+        let db = loadDB();
         let currentTab = 'teachers';
 
-        async function loadCloudDB() {
-            try {
-                const response = await fetch('/api/data');
-                if (response.ok) {
-                    db = await response.json();
-                }
-            } catch(e) {
-                console.error("Помилка завантаження даних:", e);
+        function loadDB() {
+            const data = localStorage.getItem('unity_school_db_v7');
+            if (!data) {
+                localStorage.setItem('unity_school_db_v7', JSON.stringify(DEFAULT_DATA));
+                return JSON.parse(JSON.stringify(DEFAULT_DATA));
             }
-            render();
-        }
-
-        async function saveCloudDB() {
             try {
-                await fetch('/api/data', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(db)
-                });
+                return JSON.parse(data);
             } catch(e) {
-                console.error("Помилка збереження даних:", e);
+                return JSON.parse(JSON.stringify(DEFAULT_DATA));
             }
         }
 
-        loadCloudDB();
+        function saveCloudDB() {
+            localStorage.setItem('unity_school_db_v7', JSON.stringify(db));
+        }
 
         function calculateAge(birthDateStr) {
             if (!birthDateStr) return '-';
@@ -79,6 +88,7 @@
                         ${renderMainContent()}
                     </main>
                 `;
+                renderNavTabs();
             }
         }
 
@@ -143,7 +153,8 @@
                         </div>
                     </div>
 
-                   <div id="nav-tabs-container" class="max-w-7xl mx-auto px-4 pt-2 pb-3 overflow-x-auto"></div>
+                    <div id="nav-tabs-container" class="max-w-7xl mx-auto px-4 pt-2 pb-3 overflow-x-auto"></div>
+                </header>
             `;
         }
 
@@ -165,7 +176,7 @@
 
         function renderScheduleTab() {
             const isCanEdit = db.currentUser.role === 'superadmin' || db.currentUser.role === 'admin';
-            const days = ['Понеділок', 'Вівторок', 'Середа', 'Четвер', 'П\'ятниця'];
+            const days = ['Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця"];
             const selClass = document.getElementById('sched_class_filter')?.value || db.classes[0] || '';
 
             return `
@@ -177,21 +188,22 @@
                         </div>
 
                         <div>
-                         
+                            <select id="sched_class_filter" onchange="render()" class="px-3 py-2 border rounded-xl text-sm font-semibold">
+                                ${db.classes.map(c => `<option value="\${c}" ${c === selClass ? 'selected' : ''}>Клас ${c}</option>`).join('')}
                             </select>
                         </div>
                     </div>
 
                     ${isCanEdit ? `
                     <div class="bg-white rounded-2xl shadow-sm border p-5">
-                        <h3 class="text-sm font-bold text-gray-800 mb-3">+ Додати урок до розкладу (Клас ${selClass})</h3>
+                        <h3 class="text-sm font-bold text-gray-800 mb-3">+ Додати урок до розкладу (Клас \${selClass})</h3>
                         <form onsubmit="handleAddSchedule(event, '\${selClass}')" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                             <select id="sc_day" required class="px-3 py-2 border rounded-xl text-sm">
-                                ${days.map(d => `<option value="${d}">${d}</option>`).join('')}
+                                \${days.map(d => `<option value="${d}">${d}</option>`).join('')}
                             </select>
                             <input type="number" id="sc_num" min="1" max="10" placeholder="№ уроку" required class="px-3 py-2 border rounded-xl text-sm">
                             <select id="sc_subj" required class="px-3 py-2 border rounded-xl text-sm">
-                                ${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                \${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
                             </select>
                             <input type="text" id="sc_room" placeholder="Кабінет" class="px-3 py-2 border rounded-xl text-sm">
                             <button type="submit" class="py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm">
@@ -208,7 +220,7 @@
                                 <div class="bg-white rounded-2xl shadow-sm border p-4 flex flex-col">
                                     <h4 class="font-bold text-center text-indigo-900 border-b pb-2 mb-3 bg-indigo-50/50 -mx-4 -mt-4 p-3 rounded-t-2xl">\${day}</h4>
                                     <div class="space-y-2 flex-1">
-                                        ${dayLessons.length === 0 ? `<p class="text-center text-xs text-gray-400 py-4">Немає уроків</p>` : dayLessons.map(item => `
+                                        \${dayLessons.length === 0 ? `<p class="text-center text-xs text-gray-400 py-4">Немає уроків</p>` : dayLessons.map(item => `
                                             <div class="p-2.5 bg-gray-50 border rounded-xl text-xs flex justify-between items-start">
                                                 <div>
                                                     <span class="font-bold text-indigo-600">${item.lessonNumber}. ${item.subject}</span>
@@ -260,9 +272,9 @@
                         <h2 class="text-gray-800 font-bold text-lg mb-4 flex items-center gap-2"><i class="fa-solid fa-list-ul text-indigo-600"></i> Список вчителів</h2>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
-                                <thead><tr class="border-b bg-gray-50 text-gray-500 uppercase text-[11px]"><th class="p-3">ПІБ</th><th class="p-3">Вік</th><th class="p-3">Предмети</th><th class="p-3">Класи</th><th class="p-3">Логін/Пароль</th><th class="p-3 text-right">Дії</th></tr></thead>
+                                <thead><tr class="border-b bg-gray-50 text-gray-500 uppercase text-[11px]"><th class="p-3">ПІБ</th><th class="p-3">Вік</th><th class="p-3">Предмети</th><th class="p-3">Класи</th><th class="p-3">Логін / Пароль</th><th class="p-3 text-right">Дії</th></tr></thead>
                                 <tbody class="divide-y">
-                                    ${teachers.map(t => `
+                                    ${teachers.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-gray-400">Вчителів поки немає</td></tr>` : teachers.map(t => `
                                         <tr>
                                             <td class="p-3 font-semibold">\${t.fullName}</td>
                                             <td class="p-3">\${calculateAge(t.birthDate)}</td>
@@ -302,7 +314,7 @@
                         <table class="w-full text-left text-sm">
                             <thead><tr class="border-b bg-gray-50 uppercase text-[11px]"><th class="p-3">ПІБ</th><th class="p-3">Клас</th><th class="p-3">Логін / Пароль</th><th class="p-3 text-right">Дії</th></tr></thead>
                             <tbody class="divide-y">
-                                ${students.map(s => `
+                                ${students.length === 0 ? `<tr><td colspan="4" class="p-4 text-center text-gray-400">Учних поки немає</td></tr>` : students.map(s => `
                                     <tr>
                                         <td class="p-3 font-semibold">\${s.fullName}</td>
                                         <td class="p-3 font-bold text-indigo-600">\${s.studentClass}</td>
@@ -341,10 +353,10 @@
                             <tbody class="divide-y">
                                 ${admins.map(a => `
                                     <tr>
-                                        <td class="p-3 font-semibold">${a.fullName}</td>
-                                        <td class="p-3 font-mono text-xs">${a.login} ${a.password}</td>
+                                        <td class="p-3 font-semibold">\${a.fullName}</td>
+                                        <td class="p-3 font-mono text-xs">${a.login} /${a.password}</td>
                                         <td class="p-3 text-right">
-                                            ${a.role !== 'superadmin' ? `<button onclick="handleDeleteUser('${a.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-xs text-gray-400 font-medium">Головний</span>'}
+                                            \${a.role !== 'superadmin' ? `<button onclick="handleDeleteUser('${a.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-xs text-gray-400 font-medium">Головний</span>'}
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -359,7 +371,10 @@
             return `
                 <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border p-6">
                     <h2 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-school text-indigo-600"></i> Управління Класами</h2>
-                    <form onsubmit="handleAddClass(event)" class="flex gap-3 mb-6"><input type="text" id="new_class_name" required placeholder="8-Б" class="flex-1 px-4 py-2 border rounded-xl text-sm"><button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">Додати клас</button></form>
+                    <form onsubmit="handleAddClass(event)" class="flex gap-3 mb-6">
+                        <input type="text" id="new_class_name" required placeholder="8-Б" class="flex-1 px-4 py-2 border rounded-xl text-sm">
+                        <button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">Додати клас</button>
+                    </form>
                     <div class="flex flex-wrap gap-2">${db.classes.map(c => `<div class="px-4 py-2 bg-indigo-50 rounded-xl text-indigo-800 font-semibold text-sm flex items-center gap-3"><span>Клас \${c}</span><button onclick="handleDeleteClass('\${c}')" class="text-indigo-400 hover:text-red-600"><i class="fa-solid fa-xmark text-xs"></i></button></div>`).join('')}</div>
                 </div>
             `;
@@ -369,7 +384,10 @@
             return `
                 <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border p-6">
                     <h2 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-book text-indigo-600"></i> Навчальні Предмети</h2>
-                    <form onsubmit="handleAddSubject(event)" class="flex gap-3 mb-6"><input type="text" id="new_subject_name" required placeholder="Біологія" class="flex-1 px-4 py-2 border rounded-xl text-sm"><button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">Додати предмет</button></form>
+                    <form onsubmit="handleAddSubject(event)" class="flex gap-3 mb-6">
+                        <input type="text" id="new_subject_name" required placeholder="Біологія" class="flex-1 px-4 py-2 border rounded-xl text-sm">
+                        <button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">Додати предмет</button>
+                    </form>
                     <div class="flex flex-wrap gap-2">${db.subjects.map(s => `<div class="px-4 py-2 bg-emerald-50 rounded-xl text-emerald-800 font-semibold text-sm flex items-center gap-3"><span>\${s}</span><button onclick="handleDeleteSubject('\${s}')" class="text-emerald-400 hover:text-red-600"><i class="fa-solid fa-xmark text-xs"></i></button></div>`).join('')}</div>
                 </div>
             `;
@@ -420,7 +438,7 @@
                                             <button onclick="handleAddGrade('${s.id}', '${selSubj}')" class="px-3 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700">Оцінити</button>
                                         </td>
                                         <td class="p-3 text-right">
-                                            ${stGrades.map(g => `<span class="px-2 py-0.5 ${g.val==='Н'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-800'} rounded text-xs font-bold mr-1">${g.val}</span>`).join('')}
+                                            \${stGrades.map(g => `<span class="px-2 py-0.5 ${g.val==='Н'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-800'} rounded text-xs font-bold mr-1">${g.val}</span>`).join('')}
                                         </td>
                                     </tr>
                                 `;
@@ -502,7 +520,7 @@
             if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
 
             db.users.push({ id: 'usr_' + Date.now(), fullName: name, birthDate: dob, subjects: subjs, classes: clss, login: log, password: pas, role: 'teacher' });
-            await saveCloudDB();
+            saveCloudDB();
             render();
         }
 
@@ -516,7 +534,7 @@
             if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
 
             db.users.push({ id: 'usr_' + Date.now(), fullName: name, studentClass: cls, login: log, password: pas, role: 'student' });
-            await saveCloudDB();
+            saveCloudDB();
             render();
         }
 
@@ -529,14 +547,14 @@
             if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
 
             db.users.push({ id: 'usr_' + Date.now(), fullName: name, login: log, password: pas, role: 'admin' });
-            await saveCloudDB();
+            saveCloudDB();
             render();
         }
 
         async function handleDeleteUser(id) {
             if (confirm('Видалити користувача?')) {
                 db.users = db.users.filter(u => u.id !== id);
-                await saveCloudDB();
+                saveCloudDB();
                 render();
             }
         }
@@ -544,24 +562,32 @@
         async function handleAddClass(e) {
             e.preventDefault();
             const name = document.getElementById('new_class_name').value.trim();
-            if (name && !db.classes.includes(name)) { db.classes.push(name); await saveCloudDB(); render(); }
+            if (name && !db.classes.includes(name)) { 
+                db.classes.push(name); 
+                saveCloudDB(); 
+                render(); 
+            }
         }
 
         async function handleDeleteClass(clsName) {
             db.classes = db.classes.filter(c => c !== clsName);
-            await saveCloudDB();
+            saveCloudDB();
             render();
         }
 
         async function handleAddSubject(e) {
             e.preventDefault();
             const name = document.getElementById('new_subject_name').value.trim();
-            if (name && !db.subjects.includes(name)) { db.subjects.push(name); await saveCloudDB(); render(); }
+            if (name && !db.subjects.includes(name)) { 
+                db.subjects.push(name); 
+                saveCloudDB(); 
+                render(); 
+            }
         }
 
         async function handleDeleteSubject(subjName) {
             db.subjects = db.subjects.filter(s => s !== subjName);
-            await saveCloudDB();
+            saveCloudDB();
             render();
         }
 
@@ -573,13 +599,13 @@
             const room = document.getElementById('sc_room').value.trim();
 
             db.schedule.push({ id: 'sc_' + Date.now(), studentClass: cls, day, lessonNumber: num, subject: subj, room });
-            await saveCloudDB();
+            saveCloudDB();
             render();
         }
 
         async function handleDeleteSchedule(id) {
             db.schedule = db.schedule.filter(s => s.id !== id);
-            await saveCloudDB();
+            saveCloudDB();
             render();
         }
 
@@ -589,7 +615,7 @@
             const hw = document.getElementById('l_hw').value.trim();
 
             db.lessons.push({ id: 'les_' + Date.now(), studentClass: cls, subject: subj, topic, homework: hw, date: new Date().toLocaleDateString('uk-UA') });
-            await saveCloudDB();
+            saveCloudDB();
             alert('Урок успішно збережено!');
             document.getElementById('l_topic').value = '';
             document.getElementById('l_hw').value = '';
@@ -601,36 +627,38 @@
             if (!val) return;
 
             db.grades.push({ id: 'grd_' + Date.now(), studentId, subject: subj, val, date: new Date().toLocaleDateString('uk-UA') });
-            await saveCloudDB();
+            saveCloudDB();
             render();
-        }  function renderNavTabs() {
-    const container = document.getElementById('nav-tabs-container');
-    if (!container) return;
-    
-    const u = db.currentUser;
-    if (!u) return;
-    
-    let html = '<div class="flex items-center gap-2 min-w-max">';
-    
-    if (u.role === 'superadmin' || u.role === 'admin' || u.role === 'teacher') {
-        html += `<button onclick="setTab('teachers')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'teachers' ? 'btn-tab-active' : ''}">Вчителі</button>`;
-        html += `<button onclick="setTab('students')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'students' ? 'btn-tab-active' : ''}">Учні</button>`;
-    }
-    if (u.role === 'superadmin') {
-        html += `<button onclick="setTab('admins')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'admins' ? 'btn-tab-active' : ''}">Адміни</button>`;
-    }
-    if (u.role === 'superadmin' || u.role === 'admin') {
-        html += `<button onclick="setTab('classes')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'classes' ? 'btn-tab-active' : ''}">Класи</button>`;
-        html += `<button onclick="setTab('subjects')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'subjects' ? 'btn-tab-active' : ''}">Предмети</button>`;
-        html += `<button onclick="setTab('schedule')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'schedule' ? 'btn-tab-active' : ''}">Розклад</button>`;
-    }
-    if (u.role === 'teacher') {
-        html += `<button onclick="setTab('journal')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'journal' ? 'btn-tab-active' : ''}">Журнал</button>`;
-    }
-    
-    html += '</div>';
-    container.innerHTML = html;
-}
+        }
+
+        function renderNavTabs() {
+            const container = document.getElementById('nav-tabs-container');
+            if (!container) return;
+            
+            const u = db.currentUser;
+            if (!u) return;
+            
+            let html = '<div class="flex items-center gap-2 min-w-max">';
+            
+            if (u.role === 'superadmin' || u.role === 'admin' || u.role === 'teacher') {
+                html += `<button onclick="setTab('teachers')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'teachers' ? 'btn-tab-active' : ''}">Вчителі</button>`;
+                html += `<button onclick="setTab('students')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'students' ? 'btn-tab-active' : ''}">Учні</button>`;
+            }
+            if (u.role === 'superadmin') {
+                html += `<button onclick="setTab('admins')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'admins' ? 'btn-tab-active' : ''}">Адміни</button>`;
+            }
+            if (u.role === 'superadmin' || u.role === 'admin') {
+                html += `<button onclick="setTab('classes')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'classes' ? 'btn-tab-active' : ''}">Класи</button>`;
+                html += `<button onclick="setTab('subjects')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'subjects' ? 'btn-tab-active' : ''}">Предмети</button>`;
+                html += `<button onclick="setTab('schedule')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'schedule' ? 'btn-tab-active' : ''}">Розклад</button>`;
+            }
+            if (u.role === 'teacher') {
+                html += `<button onclick="setTab('journal')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'journal' ? 'btn-tab-active' : ''}">Журнал</button>`;
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
 
         function exportData() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
@@ -641,6 +669,8 @@
             downloadAnchor.click();
             downloadAnchor.remove();
         }
+
+        render();
     </script>
 </body>
 </html>
