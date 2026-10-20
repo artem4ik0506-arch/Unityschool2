@@ -43,9 +43,9 @@
         let currentTab = 'teachers';
 
         function loadDB() {
-            const data = localStorage.getItem('unity_school_db_v7');
+            const data = localStorage.getItem('unity_school_db_v8');
             if (!data) {
-                localStorage.setItem('unity_school_db_v7', JSON.stringify(DEFAULT_DATA));
+                localStorage.setItem('unity_school_db_v8', JSON.stringify(DEFAULT_DATA));
                 return JSON.parse(JSON.stringify(DEFAULT_DATA));
             }
             try {
@@ -56,7 +56,7 @@
         }
 
         function saveCloudDB() {
-            localStorage.setItem('unity_school_db_v7', JSON.stringify(db));
+            localStorage.setItem('unity_school_db_v8', JSON.stringify(db));
         }
 
         function calculateAge(birthDateStr) {
@@ -197,13 +197,13 @@
                     ${isCanEdit ? `
                     <div class="bg-white rounded-2xl shadow-sm border p-5">
                         <h3 class="text-sm font-bold text-gray-800 mb-3">+ Додати урок до розкладу (Клас \${selClass})</h3>
-                        <form onsubmit="handleAddSchedule(event, '${selClass}')" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                        <form onsubmit="handleAddSchedule(event, '\${selClass}')" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                             <select id="sc_day" required class="px-3 py-2 border rounded-xl text-sm">
-                                ${days.map(d => `<option value="${d}">${d}</option>`).join('')}
+                                \${days.map(d => `<option value="${d}">${d}</option>`).join('')}
                             </select>
                             <input type="number" id="sc_num" min="1" max="10" placeholder="№ уроку" required class="px-3 py-2 border rounded-xl text-sm">
                             <select id="sc_subj" required class="px-3 py-2 border rounded-xl text-sm">
-                                ${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                \${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
                             </select>
                             <input type="text" id="sc_room" placeholder="Кабінет" class="px-3 py-2 border rounded-xl text-sm">
                             <button type="submit" class="py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm">
@@ -220,7 +220,7 @@
                                 <div class="bg-white rounded-2xl shadow-sm border p-4 flex flex-col">
                                     <h4 class="font-bold text-center text-indigo-900 border-b pb-2 mb-3 bg-indigo-50/50 -mx-4 -mt-4 p-3 rounded-t-2xl">\${day}</h4>
                                     <div class="space-y-2 flex-1">
-                                        ${dayLessons.length === 0 ? `<p class="text-center text-xs text-gray-400 py-4">Немає уроків</p>` : dayLessons.map(item => `
+                                        \${dayLessons.length === 0 ? `<p class="text-center text-xs text-gray-400 py-4">Немає уроків</p>` : dayLessons.map(item => `
                                             <div class="p-2.5 bg-gray-50 border rounded-xl text-xs flex justify-between items-start">
                                                 <div>
                                                     <span class="font-bold text-indigo-600">${item.lessonNumber}. ${item.subject}</span>
@@ -240,9 +240,11 @@
 
         function renderTeachersTab() {
             const teachers = db.users.filter(x => x.role === 'teacher');
+            const isAdmin = db.currentUser.role === 'superadmin' || db.currentUser.role === 'admin';
 
             return `
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    ${isAdmin ? `
                     <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border p-5">
                         <h2 class="text-indigo-600 font-bold text-lg mb-4 flex items-center gap-2"><i class="fa-solid fa-user-plus"></i> Додати вчителя</h2>
                         <form onsubmit="handleAddTeacher(event)" class="space-y-4">
@@ -251,13 +253,13 @@
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Предмети</label>
                                 <select id="t_subjects" multiple required class="w-full px-3 py-2 border rounded-xl text-sm h-24 custom-scrollbar">
-                                    ${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                    \${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Класи</label>
                                 <select id="t_classes" multiple required class="w-full px-3 py-2 border rounded-xl text-sm h-20 custom-scrollbar">
-                                    ${db.classes.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                    \${db.classes.map(c => `<option value="${c}">${c}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="grid grid-cols-2 gap-2">
@@ -267,21 +269,21 @@
                             <button type="submit" class="w-full py-2.5 bg-indigo-600 text-white font-semibold rounded-xl text-sm shadow-md">+ Додати вчителя</button>
                         </form>
                     </div>
+                    ` : ''}
 
-                    <div class="lg:col-span-8 bg-white rounded-2xl shadow-sm border p-5">
+                    <div class="${isAdmin ? 'lg:col-span-8' : 'lg:col-span-12'} bg-white rounded-2xl shadow-sm border p-5">
                         <h2 class="text-gray-800 font-bold text-lg mb-4 flex items-center gap-2"><i class="fa-solid fa-list-ul text-indigo-600"></i> Список вчителів</h2>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
-                                <thead><tr class="border-b bg-gray-50 text-gray-500 uppercase text-[11px]"><th class="p-3">ПІБ</th><th class="p-3">Вік</th><th class="p-3">Предмети</th><th class="p-3">Класи</th><th class="p-3">Логін / Пароль</th><th class="p-3 text-right">Дії</th></tr></thead>
+                                <thead><tr class="border-b bg-gray-50 text-gray-500 uppercase text-[11px]"><th class="p-3">ПІБ</th><th class="p-3">Вік</th><th class="p-3">Предмети</th><th class="p-3">Класи</th><th class="p-3">Логін / Пароль</th>${isAdmin ? '<th class="p-3 text-right">Дії</th>' : ''}</tr></thead>
                                 <tbody class="divide-y">
-                                    ${teachers.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-gray-400">Вчителів поки немає</td></tr>` : teachers.map(t => `
+                                    ${teachers.length === 0 ? `<tr><td colspan="\${isAdmin ? 6 : 5}" class="p-4 text-center text-gray-400">Вчителів поки немає</td></tr>` : teachers.map(t => `
                                         <tr>
                                             <td class="p-3 font-semibold">\${t.fullName}</td>
                                             <td class="p-3">\${calculateAge(t.birthDate)}</td>
                                             <td class="p-3">\${(t.subjects||[]).join(', ')}</td>
                                             <td class="p-3">\${(t.classes||[]).join(', ')}</td>
-                                            <td class="p-3 font-mono text-xs text-indigo-600">${t.login} /${t.password}</td>
-                                            <td class="p-3 text-right"><button onclick="handleDeleteUser('\${t.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button></td>
+                                            <td class="p-3 font-mono text-xs text-indigo-600">\${t.login} / ${t.password}</td>${isAdmin ? `<td class="p-3 text-right"><button onclick="handleDeleteUser('${t.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button></td>` : ''}
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -356,7 +358,7 @@
                                         <td class="p-3 font-semibold">\${a.fullName}</td>
                                         <td class="p-3 font-mono text-xs">${a.login} /${a.password}</td>
                                         <td class="p-3 text-right">
-                                            ${a.role !== 'superadmin' ? `<button onclick="handleDeleteUser('${a.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-xs text-gray-400 font-medium">Головний</span>'}
+                                            \${a.role !== 'superadmin' ? `<button onclick="handleDeleteUser('${a.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-xs text-gray-400 font-medium">Головний</span>'}
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -438,7 +440,7 @@
                                             <button onclick="handleAddGrade('${s.id}', '${selSubj}')" class="px-3 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700">Оцінити</button>
                                         </td>
                                         <td class="p-3 text-right">
-                                            ${stGrades.map(g => `<span class="px-2 py-0.5 ${g.val==='Н'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-800'} rounded text-xs font-bold mr-1">${g.val}</span>`).join('')}
+                                            \${stGrades.map(g => `<span class="px-2 py-0.5 ${g.val==='Н'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-800'} rounded text-xs font-bold mr-1">${g.val}</span>`).join('')}
                                         </td>
                                     </tr>
                                 `;
