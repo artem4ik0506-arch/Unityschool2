@@ -36,16 +36,19 @@
             subjects: ['Математика', 'Українська мова', 'Фізика', 'Історія України', 'Англійська мова', 'Інформатика'],
             schedule: [],
             lessons: [],
-            grades: []
+            grades: [],
+            announcements: [
+                { id: 'ann_1', title: 'Ласкаво просимо до Unity School!', text: 'Шкільний портал успішно запущено. Бажаємо всім успішного навчального року!', date: '21.10.2026', author: 'Адміністрація' }
+            ]
         };
 
         let db = loadDB();
         let currentTab = 'teachers';
 
         function loadDB() {
-            const data = localStorage.getItem('unity_school_db_v8');
+            const data = localStorage.getItem('unity_school_db_v9');
             if (!data) {
-                localStorage.setItem('unity_school_db_v8', JSON.stringify(DEFAULT_DATA));
+                localStorage.setItem('unity_school_db_v9', JSON.stringify(DEFAULT_DATA));
                 return JSON.parse(JSON.stringify(DEFAULT_DATA));
             }
             try {
@@ -56,7 +59,7 @@
         }
 
         function saveCloudDB() {
-            localStorage.setItem('unity_school_db_v8', JSON.stringify(db));
+            localStorage.setItem('unity_school_db_v9', JSON.stringify(db));
         }
 
         function calculateAge(birthDateStr) {
@@ -73,7 +76,7 @@
             if (!text) return '';
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             return text.replace(urlRegex, function(url) {
-                return `<a href="${url}" target="_blank" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-medium font-mono text-xs break-all"><i class="fa-solid fa-link"></i> Перейти за посиланням</a>`;
+                return `<a href="${url}" target="_blank" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 underline font-medium font-mono text-xs break-all"><i class="fa-solid fa-link"></i> Посилання</a>`;
             });
         }
 
@@ -84,12 +87,41 @@
             } else {
                 app.innerHTML = `
                     ${renderHeader()}
-                    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
+                    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+                        ${db.currentUser.role !== 'student' ? renderStatsOverview() : ''}
                         ${renderMainContent()}
                     </main>
                 `;
                 renderNavTabs();
             }
+        }
+
+        function renderStatsOverview() {
+            const teachersCount = db.users.filter(u => u.role === 'teacher').length;
+            const studentsCount = db.users.filter(u => u.role === 'student').length;
+            const classesCount = db.classes.length;
+            const subjectsCount = db.subjects.length;
+
+            return `
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4">
+                        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl font-bold"><i class="fa-solid fa-chalkboard-user"></i></div>
+                        <div><div class="text-xs text-gray-500 uppercase font-semibold">Вчителі</div><div class="text-xl font-bold">${teachersCount}</div></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4">
+                        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl font-bold"><i class="fa-solid fa-user-graduate"></i></div>
+                        <div><div class="text-xs text-gray-500 uppercase font-semibold">Учні</div><div class="text-xl font-bold">${studentsCount}</div></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4">
+                        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold"><i class="fa-solid fa-school"></i></div>
+                        <div><div class="text-xs text-gray-500 uppercase font-semibold">Класи</div><div class="text-xl font-bold">${classesCount}</div></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border flex items-center gap-4">
+                        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl font-bold"><i class="fa-solid fa-book-bookmark"></i></div>
+                        <div><div class="text-xs text-gray-500 uppercase font-semibold">Предмети</div><div class="text-xl font-bold">${subjectsCount}</div></div>
+                    </div>
+                </div>
+            `;
         }
 
         function renderLogin() {
@@ -101,7 +133,7 @@
                                 <i class="fa-solid fa-graduation-cap text-3xl text-white"></i>
                             </div>
                             <h1 class="text-3xl font-bold tracking-tight">Unity School</h1>
-                            <p class="text-slate-400 text-sm mt-1">Портал управління школою</p>
+                            <p class="text-slate-400 text-sm mt-1">Інноваційний шкільний портал</p>
                         </div>
 
                         <form onsubmit="handleLogin(event)" class="space-y-5">
@@ -128,7 +160,7 @@
 
         function renderHeader() {
             const u = db.currentUser;
-            let roleTitle = (u.role === 'superadmin') ? 'Головний Адміністратор' : (u.role === 'admin' ? 'Адміністратор' : (u.role === 'teacher' ? 'Вчитель' : 'Учень'));
+            let roleTitle = (u.role === 'superadmin') ? 'Головний Адміністратор' : (u.role === 'admin' ? 'Адміністратор' : (u.role === 'teacher' ? 'Вчитель' : `Учень (${u.studentClass})`));
 
             return `
                 <header class="bg-unity-header text-white shadow-md">
@@ -139,13 +171,13 @@
                             </div>
                             <div>
                                 <h1 class="text-xl font-bold leading-none">Unity School</h1>
-                                <span class="text-xs text-blue-100 font-medium">${roleTitle}</span>
+                                <span class="text-xs text-blue-100 font-medium">${u.fullName} — ${roleTitle}</span>
                             </div>
                         </div>
 
                         <div class="flex items-center gap-3">
                             <button onclick="exportData()" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-semibold transition border border-white/20">
-                                <i class="fa-solid fa-download mr-1"></i> Резервна копія
+                                <i class="fa-solid fa-download mr-1"></i> Бекап бази
                             </button>
                             <button onclick="handleLogout()" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition border border-white/20">
                                 <i class="fa-solid fa-right-from-bracket"></i> Вийти
@@ -160,7 +192,11 @@
 
         function renderMainContent() {
             const u = db.currentUser;
-            if (u.role === 'student') return currentTab === 'schedule' ? renderScheduleTab() : renderStudentDiary();
+            if (u.role === 'student') {
+                if (currentTab === 'schedule') return renderScheduleTab();
+                if (currentTab === 'announcements') return renderAnnouncementsTab();
+                return renderStudentDiary();
+            }
 
             switch (currentTab) {
                 case 'teachers': return renderTeachersTab();
@@ -170,14 +206,47 @@
                 case 'subjects': return renderSubjectsTab();
                 case 'schedule': return renderScheduleTab();
                 case 'journal': return u.role === 'teacher' ? renderTeacherJournal() : renderScheduleTab();
+                case 'announcements': return renderAnnouncementsTab();
                 default: return renderTeachersTab();
             }
+        }
+
+        function renderAnnouncementsTab() {
+            const canPost = db.currentUser.role === 'superadmin' || db.currentUser.role === 'admin';
+            return `
+                <div class="space-y-6">
+                    ${canPost ? `
+                    <div class="bg-white rounded-2xl shadow-sm border p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-bullhorn text-indigo-600"></i> Додати шкільне оголошення</h3>
+                        <form onsubmit="handleAddAnnouncement(event)" class="space-y-4">
+                            <input type="text" id="ann_title" required placeholder="Заголовок оголошення" class="w-full px-4 py-2 border rounded-xl text-sm">
+                            <textarea id="ann_text" required rows="3" placeholder="Текст оголошення..." class="w-full px-4 py-2 border rounded-xl text-sm"></textarea>
+                            <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl text-sm">Опублікувати</button>
+                        </form>
+                    </div>
+                    ` : ''}
+
+                    <div class="space-y-4">
+                        <h3 class="text-xl font-bold text-gray-800">Шкільна стрічка новин</h3>
+                        ${(db.announcements || []).length === 0 ? `<p class="text-gray-400">Оголошень поки немає.</p>` : (db.announcements || []).slice().reverse().map(a => `
+                            <div class="bg-white rounded-2xl shadow-sm border p-6 space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <h4 class="font-bold text-lg text-indigo-600">\${a.title}</h4>
+                                    <span class="text-xs text-gray-400 font-semibold">${a.date} (${a.author})</span>
+                                </div>
+                                <p class="text-sm text-gray-700 whitespace-pre-line">${formatLinks(a.text)}</p>${canPost ? `<button onclick="handleDeleteAnnouncement('${a.id}')" class="text-xs text-red-500 hover:text-red-700 font-semibold mt-2"><i class="fa-solid fa-trash"></i> Видалити оголошення</button>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
         }
 
         function renderScheduleTab() {
             const isCanEdit = db.currentUser.role === 'superadmin' || db.currentUser.role === 'admin';
             const days = ['Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця"];
-            const selClass = document.getElementById('sched_class_filter')?.value || db.classes[0] || '';
+            const defaultClass = db.currentUser.role === 'student' ? db.currentUser.studentClass : (db.classes[0] || '');
+            const selClass = document.getElementById('sched_class_filter')?.value || defaultClass;
 
             return `
                 <div class="space-y-6">
@@ -186,7 +255,6 @@
                             <i class="fa-solid fa-calendar-days text-xl"></i>
                             <h2>Розклад Уроків</h2>
                         </div>
-
                         <div>
                             <select id="sched_class_filter" onchange="render()" class="px-3 py-2 border rounded-xl text-sm font-semibold">
                                 ${db.classes.map(c => `<option value="\${c}" ${c === selClass ? 'selected' : ''}>Клас ${c}</option>`).join('')}
@@ -199,16 +267,14 @@
                         <h3 class="text-sm font-bold text-gray-800 mb-3">+ Додати урок до розкладу (Клас \${selClass})</h3>
                         <form onsubmit="handleAddSchedule(event, '\${selClass}')" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                             <select id="sc_day" required class="px-3 py-2 border rounded-xl text-sm">
-                                ${days.map(d => `<option value="${d}">${d}</option>`).join('')}
+                                \${days.map(d => `<option value="${d}">${d}</option>`).join('')}
                             </select>
                             <input type="number" id="sc_num" min="1" max="10" placeholder="№ уроку" required class="px-3 py-2 border rounded-xl text-sm">
                             <select id="sc_subj" required class="px-3 py-2 border rounded-xl text-sm">
-                                ${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                \${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
                             </select>
                             <input type="text" id="sc_room" placeholder="Кабінет" class="px-3 py-2 border rounded-xl text-sm">
-                            <button type="submit" class="py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm">
-                                Додати
-                            </button>
+                            <button type="submit" class="py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm">Додати</button>
                         </form>
                     </div>
                     ` : ''}
@@ -220,7 +286,7 @@
                                 <div class="bg-white rounded-2xl shadow-sm border p-4 flex flex-col">
                                     <h4 class="font-bold text-center text-indigo-900 border-b pb-2 mb-3 bg-indigo-50/50 -mx-4 -mt-4 p-3 rounded-t-2xl">\${day}</h4>
                                     <div class="space-y-2 flex-1">
-                                        ${dayLessons.length === 0 ? `<p class="text-center text-xs text-gray-400 py-4">Немає уроків</p>` : dayLessons.map(item => `
+                                        \${dayLessons.length === 0 ? `<p class="text-center text-xs text-gray-400 py-4">Немає уроків</p>` : dayLessons.map(item => `
                                             <div class="p-2.5 bg-gray-50 border rounded-xl text-xs flex justify-between items-start">
                                                 <div>
                                                     <span class="font-bold text-indigo-600">${item.lessonNumber}. ${item.subject}</span>
@@ -253,14 +319,13 @@
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Предмети</label>
                                 <select id="t_subjects" multiple required class="w-full px-3 py-2 border rounded-xl text-sm h-24 custom-scrollbar">
-                                    ${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                    \${db.subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 uppercase mb-1">Класи</label>
                                 <select id="t_classes" multiple required class="w-full px-3 py-2 border rounded-xl text-sm h-20 custom-scrollbar">
-                                   
-                                    ${db.classes.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                    \${db.classes.map(c => `<option value="${c}">${c}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="grid grid-cols-2 gap-2">
@@ -334,7 +399,6 @@
 
         function renderAdminsTab() {
             const admins = db.users.filter(x => x.role === 'admin' || x.role === 'superadmin');
-
             return `
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border p-5">
@@ -359,7 +423,7 @@
                                         <td class="p-3 font-semibold">\${a.fullName}</td>
                                         <td class="p-3 font-mono text-xs">${a.login} /${a.password}</td>
                                         <td class="p-3 text-right">
-                                            ${a.role !== 'superadmin' ? `<button onclick="handleDeleteUser('${a.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-xs text-gray-400 font-medium">Головний</span>'}
+                                            \${a.role !== 'superadmin' ? `<button onclick="handleDeleteUser('${a.id}')" class="text-red-500"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-xs text-gray-400 font-medium">Головний</span>'}
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -429,7 +493,7 @@
                     </div>
 
                     <table class="w-full text-left text-sm">
-                        <thead><tr class="border-b bg-gray-50 uppercase text-[11px]"><th class="p-3">ПІБ Учня</th><th class="p-3">Оцінка (1-12 / Н)</th><th class="p-3 text-right">Історія</th></tr></thead>
+                        <thead><tr class="border-b bg-gray-50 uppercase text-[11px]"><th class="p-3">ПІБ Учня</th><th class="p-3">Оцінка (1-12 / Н)</th><th class="p-3 text-right">Історія оцінок</th></tr></thead>
                         <tbody class="divide-y">
                             ${studentsInClass.length === 0 ? `<tr><td colspan="3" class="p-4 text-center text-gray-400">У цьому класі поки немає учнів</td></tr>` : studentsInClass.map(s => {
                                 const stGrades = db.grades.filter(g => g.studentId === s.id && g.subject === selSubj);
@@ -441,7 +505,7 @@
                                             <button onclick="handleAddGrade('${s.id}', '${selSubj}')" class="px-3 py-1 bg-emerald-600 text-white text-xs font-semibold rounded hover:bg-emerald-700">Оцінити</button>
                                         </td>
                                         <td class="p-3 text-right">
-                                            ${stGrades.map(g => `<span class="px-2 py-0.5 ${g.val==='Н'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-800'} rounded text-xs font-bold mr-1">${g.val}</span>`).join('')}
+                                            \${stGrades.map(g => `<span class="px-2 py-0.5 ${g.val==='Н'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-800'} rounded text-xs font-bold mr-1">${g.val}</span>`).join('')}
                                         </td>
                                     </tr>
                                 `;
@@ -455,30 +519,55 @@
         function renderStudentDiary() {
             const u = db.currentUser;
             const myLessons = db.lessons.filter(l => l.studentClass === u.studentClass);
+            const myGrades = db.grades.filter(g => g.studentId === u.id);
+
+            // Обчислюємо середній бал
+            let numericGrades = myGrades.map(g => Number(g.val)).filter(n => !isNaN(n) && n > 0);
+            let avgGrade = numericGrades.length > 0 ? (numericGrades.reduce((a, b) => a + b, 0) / numericGrades.length).toFixed(1) : '-';
 
             return `
                 <div class="space-y-6">
-                    <div class="bg-white rounded-2xl shadow-sm border p-6 flex justify-between items-center">
+                    <div class="bg-white rounded-2xl shadow-sm border p-6 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div>
                             <h2 class="text-xl font-bold text-gray-900">${u.fullName}</h2>
                             <p class="text-sm text-gray-500">Учень класу ${u.studentClass}</p>
                         </div>
-                        <button onclick="setTab('schedule')" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">
-                            <i class="fa-solid fa-calendar-days mr-1"></i> Переглянути розклад
-                        </button>
+                        <div class="flex items-center gap-3">
+                            <div class="px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-center">
+                                <div class="text-xs text-indigo-600 font-semibold uppercase">Середній бал</div>
+                                <div class="text-lg font-bold text-indigo-900">${avgGrade}</div>
+                            </div>
+                            <button onclick="setTab('schedule')" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl text-sm">
+                                <i class="fa-solid fa-calendar-days mr-1"></i> Розклад
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl shadow-sm border p-6">
-                        <h3 class="text-lg font-bold mb-4">Уроки та Домашні Завдання</h3>
-                        <div class="space-y-3">
-                            ${myLessons.length === 0 ? `<p class="text-gray-400 text-sm py-4">Уроків поки немає</p>` : myLessons.slice().reverse().map(l => `
-                                <div class="p-4 border rounded-xl bg-gray-50/50">
-                                    <div class="flex justify-between font-bold text-indigo-600 text-sm mb-1">
-                                        <span>\${l.subject}</span><span class="text-xs text-gray-400">\${l.date}</span>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white rounded-2xl shadow-sm border p-6">
+                            <h3 class="text-lg font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-book text-indigo-600"></i> Уроки та ДЗ</h3>
+                            <div class="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                                ${myLessons.length === 0 ? `<p class="text-gray-400 text-sm py-4">Уроків поки немає</p>` : myLessons.slice().reverse().map(l => `
+                                    <div class="p-4 border rounded-xl bg-gray-50/50">
+                                        <div class="flex justify-between font-bold text-indigo-600 text-sm mb-1">
+                                            <span>\${l.subject}</span><span class="text-xs text-gray-400">\${l.date}</span>
+                                        </div>
+                                        <div class="text-sm font-semibold mb-1">Тема: ${formatLinks(l.topic)}</div>${l.homework ? `<div class="text-xs bg-amber-50 text-amber-900 border border-amber-200 p-2 rounded mt-2"><strong>Д/З:</strong> ${l.homework}</div>` : ''}
                                     </div>
-                                    <div class="text-sm font-semibold mb-1">Тема: ${formatLinks(l.topic)}</div>${l.homework ? `<div class="text-xs bg-amber-50 text-amber-900 border border-amber-200 p-2 rounded mt-2"><strong>Д/З:</strong> ${l.homework}</div>` : ''}
-                                </div>
-                            `).join('')}
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-sm border p-6">
+                            <h3 class="text-lg font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-star text-amber-500"></i> Мої Оцінки</h3>
+                            <div class="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                                ${myGrades.length === 0 ? `<p class="text-gray-400 text-sm py-4">Оцінок поки немає</p>` : myGrades.map(g => `
+                                    <div class="p-3 border rounded-xl flex justify-between items-center text-sm">
+                                        <div><span class="font-bold text-gray-800">\${g.subject}</span><div class="text-xs text-gray-400">\${g.date}</div></div>
+                                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg font-bold text-sm">\${g.val}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -489,7 +578,6 @@
             e.preventDefault();
             const log = document.getElementById('login_user').value.trim();
             const pas = document.getElementById('login_pass').value.trim();
-
             const found = db.users.find(u => u.login === log && u.password === pas);
             if (found) {
                 db.currentUser = found;
@@ -521,7 +609,6 @@
             const pas = document.getElementById('t_pass').value.trim();
 
             if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
-
             db.users.push({ id: 'usr_' + Date.now(), fullName: name, birthDate: dob, subjects: subjs, classes: clss, login: log, password: pas, role: 'teacher' });
             saveCloudDB();
             render();
@@ -535,7 +622,6 @@
             const pas = document.getElementById('s_pass').value.trim();
 
             if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
-
             db.users.push({ id: 'usr_' + Date.now(), fullName: name, studentClass: cls, login: log, password: pas, role: 'student' });
             saveCloudDB();
             render();
@@ -548,7 +634,6 @@
             const pas = document.getElementById('a_pass').value.trim();
 
             if (db.users.some(u => u.login === log)) return alert('Логін зайнятий!');
-
             db.users.push({ id: 'usr_' + Date.now(), fullName: name, login: log, password: pas, role: 'admin' });
             saveCloudDB();
             render();
@@ -565,11 +650,7 @@
         async function handleAddClass(e) {
             e.preventDefault();
             const name = document.getElementById('new_class_name').value.trim();
-            if (name && !db.classes.includes(name)) { 
-                db.classes.push(name); 
-                saveCloudDB(); 
-                render(); 
-            }
+            if (name && !db.classes.includes(name)) { db.classes.push(name); saveCloudDB(); render(); }
         }
 
         async function handleDeleteClass(clsName) {
@@ -581,11 +662,7 @@
         async function handleAddSubject(e) {
             e.preventDefault();
             const name = document.getElementById('new_subject_name').value.trim();
-            if (name && !db.subjects.includes(name)) { 
-                db.subjects.push(name); 
-                saveCloudDB(); 
-                render(); 
-            }
+            if (name && !db.subjects.includes(name)) { db.subjects.push(name); saveCloudDB(); render(); }
         }
 
         async function handleDeleteSubject(subjName) {
@@ -634,15 +711,34 @@
             render();
         }
 
+        async function handleAddAnnouncement(e) {
+            e.preventDefault();
+            const title = document.getElementById('ann_title').value.trim();
+            const text = document.getElementById('ann_text').value.trim();
+            if(!db.announcements) db.announcements = [];
+            db.announcements.push({ id: 'ann_' + Date.now(), title, text, date: new Date().toLocaleDateString('uk-UA'), author: db.currentUser.fullName });
+            saveCloudDB();
+            render();
+        }
+
+        async function handleDeleteAnnouncement(id) {
+            db.announcements = db.announcements.filter(a => a.id !== id);
+            saveCloudDB();
+            render();
+        }
+
         function renderNavTabs() {
             const container = document.getElementById('nav-tabs-container');
             if (!container) return;
-            
             const u = db.currentUser;
             if (!u) return;
             
             let html = '<div class="flex items-center gap-2 min-w-max">';
+            html += `<button onclick="setTab('announcements')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'announcements' ? 'btn-tab-active' : ''}"><i class="fa-solid fa-bullhorn mr-1"></i> Новини</button>`;
             
+            if (u.role === 'student') {
+                html += `<button onclick="setTab('schedule')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'schedule' ? 'btn-tab-active' : ''}"><i class="fa-solid fa-calendar-days mr-1"></i> Розклад</button>`;
+            }
             if (u.role === 'superadmin' || u.role === 'admin' || u.role === 'teacher') {
                 html += `<button onclick="setTab('teachers')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'teachers' ? 'btn-tab-active' : ''}">Вчителі</button>`;
                 html += `<button onclick="setTab('students')" class="px-4 py-2 rounded-xl text-sm font-medium transition ${currentTab === 'students' ? 'btn-tab-active' : ''}">Учні</button>`;
