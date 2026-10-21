@@ -267,7 +267,7 @@
                         <h3 class="text-sm font-bold text-gray-800 mb-3">+ Додати урок до розкладу (Клас \${selClass})</h3>
                         <form onsubmit="handleAddSchedule(event, '\${selClass}')" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                             <select id="sc_day" required class="px-3 py-2 border rounded-xl text-sm">
-                                \${days.map(d => `<option value="${d}">${d}</option>`).join('')}
+                                ${days.map(d => `<option value="${d}">${d}</option>`).join('')}
                             </select>
                             <input type="number" id="sc_num" min="1" max="10" placeholder="№ уроку" required class="px-3 py-2 border rounded-xl text-sm">
                             <select id="sc_subj" required class="px-3 py-2 border rounded-xl text-sm">
